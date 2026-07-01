@@ -99,7 +99,7 @@ export default function PromptsPage() {
 
                 {!query.isLoading ? (
                     <div>
-                        <div className="mx-auto grid max-w-7xl gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                        <div className="mx-auto grid max-w-7xl items-start gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                             {promptItems.map((item) => (
                                 <PromptCard
                                     key={item.id}

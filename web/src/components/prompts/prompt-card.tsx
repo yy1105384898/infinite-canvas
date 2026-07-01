@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { Button, Card, Tag } from "antd";
 
 import { formatPromptDate, type Prompt } from "@/services/api/prompts";
+import { PromptCover } from "@/components/prompts/prompt-cover";
 
 export function PromptCard({
     item,
@@ -29,9 +30,11 @@ export function PromptCard({
             className="overflow-hidden"
             styles={{ body: { padding: 0 } }}
             cover={
-                <button type="button" className="block w-full text-left" onClick={onOpen}>
-                    <img src={item.coverUrl} alt={item.title} className="aspect-[4/3] w-full object-cover" />
-                </button>
+                item.coverUrl ? (
+                    <button type="button" className="block w-full text-left" onClick={onOpen}>
+                        <PromptCover prompt={item} className="aspect-[4/3] w-full" />
+                    </button>
+                ) : null
             }
         >
             <button type="button" className="block w-full text-left" onClick={onOpen}>

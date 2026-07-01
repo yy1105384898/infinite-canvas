@@ -70,7 +70,7 @@ export function PromptSelectDialog({ open, onOpenChange, onSelect }: { open: boo
                             <Spin />
                         </div>
                     ) : null}
-                    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="grid items-start gap-5 sm:grid-cols-2 lg:grid-cols-3">
                         {items.map((item) => (
                             <PromptCard key={item.id} item={item} onOpen={() => selectPrompt(item.prompt)} onCopy={() => selectPrompt(item.prompt)} actionLabel="使用此提示词" actionIcon={<Check className="size-3.5" />} actionType="primary" />
                         ))}
