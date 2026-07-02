@@ -30,7 +30,7 @@ export function PromptCard({
             className="overflow-hidden"
             styles={{ body: { padding: 0 } }}
             cover={
-                item.coverUrl ? (
+                item.coverUrl || item.videoUrl ? (
                     <button type="button" className="block w-full text-left" onClick={onOpen}>
                         <PromptCover prompt={item} className="aspect-[4/3] w-full" />
                     </button>

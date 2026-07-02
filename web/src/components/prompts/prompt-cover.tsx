@@ -4,6 +4,10 @@ import type { Prompt } from "@/services/api/prompts";
 import { cn } from "@/lib/utils";
 
 export function PromptCover({ prompt, className }: { prompt: Prompt; className?: string }) {
+    if (prompt.videoUrl) {
+        return <video src={prompt.videoUrl} poster={prompt.coverUrl || undefined} autoPlay muted loop playsInline preload="metadata" className={cn("bg-stone-100 object-cover dark:bg-stone-900", className)} />;
+    }
+
     if (prompt.coverUrl) {
         return <img src={prompt.coverUrl} alt={prompt.title} className={cn("bg-stone-100 object-cover dark:bg-stone-900", className)} />;
     }

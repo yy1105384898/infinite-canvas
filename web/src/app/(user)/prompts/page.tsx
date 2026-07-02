@@ -1,6 +1,6 @@
 "use client";
 
-import { FolderPlus, Search } from "lucide-react";
+import { ChevronDown, ChevronUp, FolderPlus, Search } from "lucide-react";
 import { type UIEvent, useEffect, useState } from "react";
 import { App, Button, Empty, Input, Spin, Tag } from "antd";
 
@@ -10,17 +10,20 @@ import { usePromptList } from "@/components/prompts/use-prompt-list";
 import { useCopyText } from "@/hooks/use-copy-text";
 import { cn } from "@/lib/utils";
 import { useAssetStore } from "@/stores/use-asset-store";
-import { ALL_PROMPTS_OPTION, type Prompt } from "@/services/api/prompts";
+import { ALL_PROMPTS_OPTION, PROMPT_MODALITY_OPTIONS, type Prompt } from "@/services/api/prompts";
 
 export default function PromptsPage() {
     const { message } = App.useApp();
     const [titleKeyword, setTitleKeyword] = useState("");
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
     const [selectedCategory, setSelectedCategory] = useState(ALL_PROMPTS_OPTION);
+    const [selectedModality, setSelectedModality] = useState(ALL_PROMPTS_OPTION);
     const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
+    const [showAllTags, setShowAllTags] = useState(false);
     const addAsset = useAssetStore((state) => state.addAsset);
     const copyText = useCopyText();
-    const { query, items: promptItems, tags: promptTags, categories: promptCategoryOptions, total: totalPrompts } = usePromptList({ keyword: titleKeyword, tags: selectedTags, category: selectedCategory });
+    const { query, items: promptItems, tags: promptTags, categories: promptCategoryOptions, total: totalPrompts } = usePromptList({ keyword: titleKeyword, tags: selectedTags, category: selectedCategory, modality: selectedModality });
+    const visibleTags = showAllTags ? promptTags : promptTags.slice(0, 32);
 
     useEffect(() => {
         if (query.isError) {
@@ -78,9 +81,29 @@ export default function PromptsPage() {
                                     </div>
                                 </div>
                                 <div className="grid gap-2 sm:grid-cols-[56px_minmax(0,1fr)] sm:items-start">
-                                    <div className="pt-2 text-xs font-medium text-stone-500 dark:text-stone-400">标签</div>
+                                    <div className="pt-2 text-xs font-medium text-stone-500 dark:text-stone-400">筛选</div>
                                     <div className="flex flex-wrap gap-2">
-                                        {promptTags.map((tag) => (
+                                        {PROMPT_MODALITY_OPTIONS.map((option) => (
+                                            <Tag.CheckableTag
+                                                key={option.value}
+                                                checked={selectedModality === option.value}
+                                                className={cn("prompt-filter-tag", selectedModality === option.value && "is-active")}
+                                                onChange={() => setSelectedModality(option.value)}
+                                            >
+                                                {option.label}
+                                            </Tag.CheckableTag>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="grid gap-2 sm:grid-cols-[56px_minmax(0,1fr)] sm:items-start">
+                                    <div className="pt-2 text-xs font-medium text-stone-500 dark:text-stone-400">标签</div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        {showAllTags && promptTags.length > 32 ? (
+                                            <Button type="link" size="small" className="h-6 px-0 text-xs" icon={<ChevronUp className="size-3.5" />} iconPosition="end" onClick={() => setShowAllTags(false)}>
+                                                收起
+                                            </Button>
+                                        ) : null}
+                                        {visibleTags.map((tag) => (
                                             <Tag.CheckableTag
                                                 key={tag}
                                                 checked={tag === ALL_PROMPTS_OPTION ? selectedTags.length === 0 : selectedTags.includes(tag)}
@@ -90,6 +113,15 @@ export default function PromptsPage() {
                                                 {tag}
                                             </Tag.CheckableTag>
                                         ))}
+                                        {promptTags.length > visibleTags.length ? (
+                                            <Button type="link" size="small" className="h-6 px-0 text-xs" icon={<ChevronDown className="size-3.5" />} iconPosition="end" onClick={() => setShowAllTags(true)}>
+                                                展开全部 ({promptTags.length})
+                                            </Button>
+                                        ) : showAllTags && promptTags.length > 32 ? (
+                                            <Button type="link" size="small" className="h-6 px-0 text-xs" icon={<ChevronUp className="size-3.5" />} iconPosition="end" onClick={() => setShowAllTags(false)}>
+                                                收起
+                                            </Button>
+                                        ) : null}
                                     </div>
                                 </div>
                             </div>
