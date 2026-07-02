@@ -7,6 +7,8 @@ import { Button } from "antd";
 import { ModelPicker } from "@/components/model-picker";
 import { defaultConfig, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { CreditSymbol, requestCreditCost } from "@/constant/credits";
+import { useModelPricing } from "@/hooks/use-model-pricing";
+import { modelRequestCostLabel } from "@/services/api/pricing";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
@@ -41,6 +43,8 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
     const isEditingExistingContent = hasTextContent || hasImageContent;
     const [prompt, setPrompt] = useState(isEditingExistingContent ? "" : node.metadata?.prompt || "");
     const credits = requestCreditCost({ channelMode: config.channelMode, model: config.model, count: mode === "image" ? config.count : 1 });
+    const pricing = useModelPricing(config, config.model);
+    const priceLabel = modelRequestCostLabel(pricing.item, { durationSeconds: config.videoSeconds, count: mode === "image" ? config.count : 1 });
 
     useEffect(() => {
         setPrompt(isEditingExistingContent ? "" : node.metadata?.prompt || "");
@@ -122,10 +126,14 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
                             </>
                         ) : (
                             <>
-                                <span className="inline-flex items-center gap-1 text-xs font-medium tabular-nums">
-                                    <CreditSymbol />
-                                    {credits.toLocaleString()}
-                                </span>
+                                {priceLabel ? (
+                                    <span className="inline-flex items-center gap-1 text-xs font-medium tabular-nums">{priceLabel}</span>
+                                ) : (
+                                    <span className="inline-flex items-center gap-1 text-xs font-medium tabular-nums">
+                                        <CreditSymbol />
+                                        {credits.toLocaleString()}
+                                    </span>
+                                )}
                                 <ArrowUp className="size-4" />
                             </>
                         )}

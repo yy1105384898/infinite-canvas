@@ -5,7 +5,8 @@ import { Cpu } from "lucide-react";
 
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { modelOptionLabel, modelOptionName, selectableModelsByCapability, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
+import { fetchChannelPricingSnapshot, findModelPricing, modelPricingLabel, type ChannelPricingSnapshot } from "@/services/api/pricing";
+import { modelOptionLabel, modelOptionName, resolveModelChannel, selectableModelsByCapability, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
 
 type ModelPickerProps = {
     config: AiConfig;
@@ -21,8 +22,22 @@ type ModelPickerProps = {
 export function ModelPicker({ config, value, onChange, capability, className, fullWidth = false, placeholder = "选择模型", onMissingConfig }: ModelPickerProps) {
     const pickerId = useId();
     const [open, setOpen] = useState(false);
+    const [pricingByBaseUrl, setPricingByBaseUrl] = useState<Record<string, ChannelPricingSnapshot>>({});
     const options = useMemo(() => Array.from(new Set([...(config.channelMode === "local" && !capability ? [value] : []), ...selectableModelsByCapability(config, capability)].filter((model): model is string => Boolean(model)))), [capability, config, value]);
     const current = value || "";
+    const modelsForPricing = useMemo(() => Array.from(new Set([current, ...options].filter(Boolean))), [current, options]);
+
+    useEffect(() => {
+        let cancelled = false;
+        const baseUrls = Array.from(new Set(modelsForPricing.map((model) => resolveModelChannel(config, model).baseUrl.trim()).filter(Boolean)));
+        if (!baseUrls.length) return;
+        Promise.all(baseUrls.map(async (baseUrl) => [baseUrl, await fetchChannelPricingSnapshot(baseUrl)] as const)).then((entries) => {
+            if (!cancelled) setPricingByBaseUrl((value) => ({ ...value, ...Object.fromEntries(entries) }));
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [config, modelsForPricing]);
 
     useEffect(() => {
         const closeOtherPicker = (event: Event) => {
@@ -70,7 +85,7 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
                 {options.length ? (
                     options.map((model) => (
                         <SelectItem key={model} value={model} textValue={modelOptionLabel(config, model)}>
-                            <ModelLabel config={config} model={model} />
+                            <ModelLabel config={config} model={model} price={priceForModel(config, model, pricingByBaseUrl)} />
                         </SelectItem>
                     ))
                 ) : (
@@ -89,13 +104,19 @@ function emptyModelLabel(config: AiConfig, capability?: ModelCapability) {
     return config.models.length ? `暂无匹配的${label}模型` : "请先到配置里添加渠道和模型";
 }
 
-function ModelLabel({ config, model }: { config: AiConfig; model: string }) {
+function ModelLabel({ config, model, price }: { config: AiConfig; model: string; price?: string }) {
     return (
         <span className="flex min-w-0 items-center gap-2">
             <ModelIcon model={model} />
             <span className="truncate">{modelOptionLabel(config, model)}</span>
+            {price ? <span className="ml-auto shrink-0 text-xs opacity-55">{price}</span> : null}
         </span>
     );
+}
+
+function priceForModel(config: AiConfig, model: string, pricingByBaseUrl: Record<string, ChannelPricingSnapshot>) {
+    const channel = resolveModelChannel(config, model);
+    return modelPricingLabel(findModelPricing(pricingByBaseUrl[channel.baseUrl.trim()], modelOptionName(model)));
 }
 
 function ModelIcon({ model }: { model: string }) {

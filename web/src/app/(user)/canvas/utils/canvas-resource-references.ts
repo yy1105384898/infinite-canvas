@@ -9,6 +9,7 @@ export type CanvasResourceReference = {
     nodeId: string;
     kind: CanvasResourceKind;
     label: string;
+    apiLabel?: string;
     title: string;
     previewUrl?: string;
     text?: string;
@@ -63,12 +64,14 @@ function labelResourceNodes(nodes: CanvasNodeData[], active: boolean) {
         if (!kind) return [];
         const index = counts[kind]++;
         const label = labelForKind(kind, index);
+        const apiLabel = apiLabelForKind(kind, index);
         return [
             {
                 id: node.id,
                 nodeId: node.id,
                 kind,
                 label,
+                apiLabel,
                 title: node.title || label,
                 previewUrl: node.metadata?.content,
                 text: node.type === CanvasNodeType.Text ? node.metadata?.content || node.metadata?.prompt : undefined,
@@ -76,6 +79,13 @@ function labelResourceNodes(nodes: CanvasNodeData[], active: boolean) {
             },
         ];
     });
+}
+
+export function apiLabelForKind(kind: CanvasResourceKind, index: number) {
+    if (kind === "image") return `@image${index + 1}`;
+    if (kind === "video") return `@video${index + 1}`;
+    if (kind === "audio") return `@audio${index + 1}`;
+    return undefined;
 }
 
 function labelForKind(kind: CanvasResourceKind, index: number) {

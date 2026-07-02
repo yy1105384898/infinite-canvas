@@ -15,6 +15,7 @@ export const seedanceResolutionOptions = [
     { value: "480p", label: "480p" },
     { value: "720p", label: "720p" },
     { value: "1080p", label: "1080p" },
+    { value: "4k", label: "4K" },
 ] as const;
 
 export const seedanceRatioOptions = [
@@ -54,6 +55,14 @@ const seedancePixels = {
         "9:16": "1080x1920",
         "21:9": "2206x946",
     },
+    "4k": {
+        "16:9": "3840x2160",
+        "4:3": "2880x2160",
+        "1:1": "2160x2160",
+        "3:4": "2160x2880",
+        "9:16": "2160x3840",
+        "21:9": "4096x1756",
+    },
 } as const;
 
 export function isSeedanceVideoConfig(config: AiConfig | Pick<AiConfig, "model" | "videoModel" | "baseUrl">) {
@@ -76,16 +85,28 @@ export function isArkPlanBaseUrl(baseUrl: string) {
 }
 
 export function normalizeSeedanceResolution(value: string, model = "") {
+    const modelResolution = seedanceModelResolution(model);
+    if (modelResolution) return modelResolution;
     const normalized = normalizeResolutionToken(value);
     if (isSeedanceFastModel(model) && normalized === "1080p") return "720p";
     return seedanceResolutionOptions.some((item) => item.value === normalized) ? normalized : "720p";
 }
 
 export function normalizeResolutionToken(value: string) {
+    if (String(value).toLowerCase() === "4k") return "4k";
     if (value === "low") return "480p";
     if (value === "auto" || value === "high" || value === "medium") return "720p";
     const resolution = String(value || "").replace(/p$/i, "") || "720";
     return `${resolution}p`;
+}
+
+export function seedanceModelResolution(model: string) {
+    const value = model.toLowerCase();
+    if (value.includes("4k")) return "4k";
+    if (value.includes("1080p")) return "1080p";
+    if (value.includes("480p")) return "480p";
+    if (value.includes("720p")) return "720p";
+    return "";
 }
 
 export function normalizeSeedanceDuration(value: string) {

@@ -13,6 +13,7 @@ export type NodeGenerationContext = {
     referenceAudios: ReferenceAudio[];
     textCount: number;
     imageCount: number;
+    frameImageCount: number;
     videoCount: number;
     audioCount: number;
 };
@@ -41,6 +42,7 @@ export function buildNodeGenerationContext(nodeId: string, nodes: CanvasNodeData
     const referenceImages = inputs.map((input) => input.image).filter((image): image is ReferenceImage => Boolean(image));
     const referenceVideos = inputs.map((input) => input.video).filter((video): video is ReferenceVideo => Boolean(video));
     const referenceAudios = inputs.map((input) => input.audio).filter((audio): audio is ReferenceAudio => Boolean(audio));
+    const frameImageCount = referenceImages.filter((image) => image.videoFrameRole).length;
 
     return {
         prompt: upstreamText ? `${prompt}\n\n${upstreamText}` : prompt,
@@ -49,6 +51,7 @@ export function buildNodeGenerationContext(nodeId: string, nodes: CanvasNodeData
         referenceAudios,
         textCount: inputs.filter((input) => input.type === "text").length,
         imageCount: referenceImages.length,
+        frameImageCount,
         videoCount: referenceVideos.length,
         audioCount: referenceAudios.length,
     };
@@ -87,6 +90,7 @@ function buildComposerGenerationContext(inputs: NodeGenerationInput[], prompt: s
     const referenceImages = selectedInputs.map((input) => input.image).filter((image): image is ReferenceImage => Boolean(image));
     const referenceVideos = selectedInputs.map((input) => input.video).filter((video): video is ReferenceVideo => Boolean(video));
     const referenceAudios = selectedInputs.map((input) => input.audio).filter((audio): audio is ReferenceAudio => Boolean(audio));
+    const frameImageCount = referenceImages.filter((image) => image.videoFrameRole).length;
 
     if (!hasToken) {
         return {
@@ -96,6 +100,7 @@ function buildComposerGenerationContext(inputs: NodeGenerationInput[], prompt: s
             referenceAudios: [],
             textCount: 0,
             imageCount: 0,
+            frameImageCount: 0,
             videoCount: 0,
             audioCount: 0,
         };
@@ -108,6 +113,7 @@ function buildComposerGenerationContext(inputs: NodeGenerationInput[], prompt: s
         referenceAudios,
         textCount: counts.text,
         imageCount: referenceImages.length,
+        frameImageCount,
         videoCount: referenceVideos.length,
         audioCount: referenceAudios.length,
     };
@@ -165,7 +171,16 @@ function readReferenceImage(node: CanvasNodeData): ReferenceImage | null {
         type: node.metadata.mimeType || "image/png",
         dataUrl: node.metadata.content,
         storageKey: node.metadata.storageKey,
+        videoFrameRole: imageFrameRole(node.title),
     };
+}
+
+function imageFrameRole(title: string): ReferenceImage["videoFrameRole"] {
+    const value = title.trim().toLowerCase();
+    if (!value) return undefined;
+    if (["首帧", "首图", "起始", "开始", "开头", "first", "start"].some((prefix) => value.startsWith(prefix)) || value.includes("first frame")) return "first";
+    if (["尾帧", "尾图", "末帧", "结束", "结尾", "last", "end"].some((prefix) => value.startsWith(prefix)) || value.includes("last frame")) return "last";
+    return undefined;
 }
 
 function readReferenceVideo(node: CanvasNodeData): ReferenceVideo | null {

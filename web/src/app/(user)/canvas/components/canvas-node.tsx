@@ -393,9 +393,11 @@ function UnknownNodeContent({ theme }: Pick<NodeContentRendererProps, "theme">) 
 function TextContent({ node, theme, isEditingContent, textareaRef, mentionReferences, onContentChange, onStopEditing, onGenerateImage }: NodeContentRendererProps) {
     const fontSize = node.metadata?.fontSize || 14;
     const textStyle = { fontSize: `${fontSize}px`, lineHeight: `${Math.round(fontSize * 1.65)}px`, color: theme.node.text, boxSizing: "border-box" } as React.CSSProperties;
+    const attachedMediaReferences = mentionReferences.filter((reference) => reference.active && reference.kind !== "text");
 
     return (
-        <div className="flex h-full w-full flex-col overflow-hidden pt-8">
+        <div className={`flex h-full w-full flex-col overflow-hidden ${attachedMediaReferences.length ? "pt-20" : "pt-8"}`}>
+            {attachedMediaReferences.length ? <AttachedReferenceStrip references={attachedMediaReferences} /> : null}
             <button
                 type="button"
                 className="absolute right-3 top-3 z-20 inline-flex h-8 items-center gap-1 rounded-full border px-2.5 text-xs font-medium opacity-85 backdrop-blur-md transition hover:scale-[1.02] hover:opacity-100"
@@ -420,6 +422,7 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
                     value={node.metadata?.content || ""}
                     references={mentionReferences}
                     highlightLabels={false}
+                    mentionMenuEnabled={false}
                     onChange={(value) => onContentChange(node.id, value)}
                     onBlur={onStopEditing}
                     onKeyDown={(event) => {
@@ -439,6 +442,31 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
                 </div>
             )}
         </div>
+    );
+}
+
+function AttachedReferenceStrip({ references }: { references: CanvasResourceReference[] }) {
+    return (
+        <div className="pointer-events-none absolute left-4 top-3 z-20 flex max-w-[calc(100%-112px)] flex-wrap items-start gap-2">
+            {references.slice(0, 9).map((reference) => (
+                <div key={reference.nodeId} className="flex min-w-0 flex-col items-start gap-1">
+                    <ReferenceTinyPreview reference={reference} />
+                    <span className="max-w-16 truncate text-[10px] font-semibold leading-none text-[#2f80ff]">{reference.apiLabel || reference.label}</span>
+                </div>
+            ))}
+            {references.length > 9 ? <span className="rounded bg-black/45 px-1.5 py-1 text-[10px] font-medium leading-none text-white">+{references.length - 9}</span> : null}
+        </div>
+    );
+}
+
+function ReferenceTinyPreview({ reference }: { reference: CanvasResourceReference }) {
+    if (reference.kind === "image" && reference.previewUrl) return <img src={reference.previewUrl} alt="" className="size-10 rounded-md object-cover shadow-sm" />;
+    if (reference.kind === "video" && reference.previewUrl) return <video src={reference.previewUrl} className="size-10 rounded-md bg-black object-cover shadow-sm" muted preload="metadata" />;
+    const Icon = reference.kind === "audio" ? Music2 : reference.kind === "video" ? Video : ImageIcon;
+    return (
+        <span className="grid size-10 place-items-center rounded-md bg-black/15 shadow-sm">
+            <Icon className="size-4 opacity-65" />
+        </span>
     );
 }
 

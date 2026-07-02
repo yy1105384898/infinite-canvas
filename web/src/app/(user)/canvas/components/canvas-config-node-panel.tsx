@@ -7,6 +7,8 @@ import { Button, Segmented } from "antd";
 import { ModelPicker } from "@/components/model-picker";
 import { defaultConfig, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { CreditSymbol, requestCreditCost } from "@/constant/credits";
+import { useModelPricing } from "@/hooks/use-model-pricing";
+import { modelRequestCostLabel } from "@/services/api/pricing";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
@@ -17,7 +19,7 @@ import type { CanvasGenerationMode, CanvasNodeData, CanvasNodeMetadata } from ".
 type CanvasConfigNodePanelProps = {
     node: CanvasNodeData;
     isRunning: boolean;
-    inputSummary: { textCount: number; imageCount: number; videoCount: number; audioCount: number };
+    inputSummary: { textCount: number; imageCount: number; frameImageCount: number; videoCount: number; audioCount: number };
     onConfigChange: (nodeId: string, patch: Partial<CanvasNodeMetadata>) => void;
     onGenerate: (nodeId: string) => void;
     onStop: (nodeId: string) => void;
@@ -32,6 +34,8 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
     const config = buildNodeConfig(globalConfig, node, mode);
     const count = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     const credits = requestCreditCost({ channelMode: config.channelMode, model: config.model, count: mode === "image" ? count : 1 });
+    const pricing = useModelPricing(config, config.model);
+    const priceLabel = modelRequestCostLabel(pricing.item, { durationSeconds: config.videoSeconds, count: mode === "image" ? count : 1 });
     const chipStyle = { background: theme.node.fill, borderColor: theme.node.stroke, color: theme.node.text };
     const hasAnyInput = Boolean(inputSummary.textCount || inputSummary.imageCount || inputSummary.videoCount || inputSummary.audioCount);
     const hasComposerContent = Boolean((node.metadata?.composerContent ?? node.metadata?.prompt ?? "").trim());
@@ -92,6 +96,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
             <div className="mb-2 flex flex-wrap gap-1.5">
                 <InputChip label="提示词" value={`${inputSummary.textCount} 个`} style={chipStyle} />
                 <InputChip label="参考图" value={`${inputSummary.imageCount} 张`} style={chipStyle} />
+                {mode === "video" && inputSummary.frameImageCount ? <InputChip label="首尾帧" value={`${inputSummary.frameImageCount}/2`} style={chipStyle} /> : null}
                 <InputChip label="参考视频" value={`${inputSummary.videoCount} 个`} style={chipStyle} />
                 <InputChip label="参考音频" value={`${inputSummary.audioCount} 个`} style={chipStyle} />
                 <button type="button" className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-md border px-2 text-[11px]" style={chipStyle} onMouseDown={(event) => event.stopPropagation()} onClick={onComposerToggle}>
@@ -129,8 +134,14 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
                     ) : (
                         <>
                             <span className="inline-flex items-center gap-1">
-                                <CreditSymbol />
-                                {credits.toLocaleString()}
+                                {priceLabel ? (
+                                    priceLabel
+                                ) : (
+                                    <>
+                                        <CreditSymbol />
+                                        {credits.toLocaleString()}
+                                    </>
+                                )}
                             </span>
                             <Play className="size-4" />
                             <span>开始生成</span>
