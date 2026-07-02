@@ -46,6 +46,7 @@ type CanvasNodeProps = {
     onRetry?: (node: CanvasNodeData) => void;
     onGenerateImage?: (node: CanvasNodeData) => void;
     onViewImage?: (node: CanvasNodeData) => void;
+    onViewReference?: (nodeId: string) => void;
     onContextMenu: (event: React.MouseEvent, nodeId: string) => void;
 };
 
@@ -65,6 +66,7 @@ type NodeContentRendererProps = {
     mentionReferences: CanvasResourceReference[];
     onRetry?: (node: CanvasNodeData) => void;
     onGenerateImage?: (node: CanvasNodeData) => void;
+    onViewReference?: (nodeId: string) => void;
     onToggleBatch?: () => void;
     onSetBatchPrimary?: () => void;
 };
@@ -101,6 +103,7 @@ export const CanvasNode = React.memo(function CanvasNode({
     onRetry,
     onGenerateImage,
     onViewImage,
+    onViewReference,
     onContextMenu,
 }: CanvasNodeProps) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
@@ -310,6 +313,7 @@ export const CanvasNode = React.memo(function CanvasNode({
                         onStopEditing={() => setIsEditingContent(false)}
                         onRetry={onRetry}
                         onGenerateImage={onGenerateImage}
+                        onViewReference={onViewReference}
                         onToggleBatch={() => onToggleBatch?.(data.id)}
                         onSetBatchPrimary={() => onSetBatchPrimary?.(data)}
                     />
@@ -390,14 +394,14 @@ function UnknownNodeContent({ theme }: Pick<NodeContentRendererProps, "theme">) 
     );
 }
 
-function TextContent({ node, theme, isEditingContent, textareaRef, mentionReferences, onContentChange, onStopEditing, onGenerateImage }: NodeContentRendererProps) {
+function TextContent({ node, theme, isEditingContent, textareaRef, mentionReferences, onContentChange, onStopEditing, onGenerateImage, onViewReference }: NodeContentRendererProps) {
     const fontSize = node.metadata?.fontSize || 14;
     const textStyle = { fontSize: `${fontSize}px`, lineHeight: `${Math.round(fontSize * 1.65)}px`, color: theme.node.text, boxSizing: "border-box" } as React.CSSProperties;
     const attachedMediaReferences = mentionReferences.filter((reference) => reference.active && reference.kind !== "text");
 
     return (
         <div className={`flex h-full w-full flex-col overflow-hidden ${attachedMediaReferences.length ? "pt-20" : "pt-8"}`}>
-            {attachedMediaReferences.length ? <AttachedReferenceStrip references={attachedMediaReferences} /> : null}
+            {attachedMediaReferences.length ? <AttachedReferenceStrip references={attachedMediaReferences} onViewReference={onViewReference} /> : null}
             <button
                 type="button"
                 className="absolute right-3 top-3 z-20 inline-flex h-8 items-center gap-1 rounded-full border px-2.5 text-xs font-medium opacity-85 backdrop-blur-md transition hover:scale-[1.02] hover:opacity-100"
@@ -445,12 +449,12 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
     );
 }
 
-function AttachedReferenceStrip({ references }: { references: CanvasResourceReference[] }) {
+function AttachedReferenceStrip({ references, onViewReference }: { references: CanvasResourceReference[]; onViewReference?: (nodeId: string) => void }) {
     return (
         <div className="pointer-events-none absolute left-4 top-3 z-20 flex max-w-[calc(100%-112px)] flex-wrap items-start gap-2">
             {references.slice(0, 9).map((reference) => (
                 <div key={reference.nodeId} className="flex min-w-0 flex-col items-start gap-1">
-                    <ReferenceTinyPreview reference={reference} />
+                    <ReferenceTinyPreview reference={reference} onViewReference={onViewReference} />
                     <span className="max-w-16 truncate text-[10px] font-semibold leading-none text-[#2f80ff]">{reference.apiLabel || reference.label}</span>
                 </div>
             ))}
@@ -459,8 +463,26 @@ function AttachedReferenceStrip({ references }: { references: CanvasResourceRefe
     );
 }
 
-function ReferenceTinyPreview({ reference }: { reference: CanvasResourceReference }) {
-    if (reference.kind === "image" && reference.previewUrl) return <img src={reference.previewUrl} alt="" className="size-10 rounded-md object-cover shadow-sm" />;
+function ReferenceTinyPreview({ reference, onViewReference }: { reference: CanvasResourceReference; onViewReference?: (nodeId: string) => void }) {
+    if (reference.kind === "image" && reference.previewUrl)
+        return (
+            <button
+                type="button"
+                className="pointer-events-auto block size-10 overflow-hidden rounded-md shadow-sm outline-none ring-0 transition hover:scale-105 focus-visible:ring-2 focus-visible:ring-[#2f80ff]"
+                title="双击放大图片"
+                aria-label="双击放大图片"
+                onMouseDown={(event) => event.stopPropagation()}
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => event.stopPropagation()}
+                onDoubleClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onViewReference?.(reference.nodeId);
+                }}
+            >
+                <img src={reference.previewUrl} alt="" className="h-full w-full object-cover" draggable={false} />
+            </button>
+        );
     if (reference.kind === "video" && reference.previewUrl) return <video src={reference.previewUrl} className="size-10 rounded-md bg-black object-cover shadow-sm" muted preload="metadata" />;
     const Icon = reference.kind === "audio" ? Music2 : reference.kind === "video" ? Video : ImageIcon;
     return (
