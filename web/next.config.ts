@@ -16,12 +16,36 @@ export default function nextConfig(phase: string): NextConfig {
     return {
         output: "standalone",
         allowedDevOrigins: isDev ? ["*.*.*.*"] : [],
+        compress: true,
+        poweredByHeader: false,
         typescript: {
             ignoreBuildErrors: true,
         },
         env: {
             NEXT_PUBLIC_APP_VERSION: localVersion,
             NEXT_PUBLIC_APP_RELEASES: JSON.stringify(releases),
+        },
+        async headers() {
+            return [
+                {
+                    source: "/icons/:path*",
+                    headers: [
+                        {
+                            key: "Cache-Control",
+                            value: "public, max-age=604800, stale-while-revalidate=86400",
+                        },
+                    ],
+                },
+                {
+                    source: "/logo.svg",
+                    headers: [
+                        {
+                            key: "Cache-Control",
+                            value: "public, max-age=604800, stale-while-revalidate=86400",
+                        },
+                    ],
+                },
+            ];
         },
     };
 }

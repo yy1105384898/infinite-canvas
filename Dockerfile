@@ -21,7 +21,9 @@ COPY --from=web-build /app/web/.next/static /app/web/.next/static
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD node -e "fetch('http://127.0.0.1:3000/').then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["sh", "-c", "cd /app/web && PORT=3000 node server.js"]
