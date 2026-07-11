@@ -1,3 +1,5 @@
+"use client";
+
 import type { CSSProperties } from "react";
 import { BookOpen, Keyboard, Settings2 } from "lucide-react";
 

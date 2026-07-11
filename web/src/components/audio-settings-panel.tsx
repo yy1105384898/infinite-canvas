@@ -1,3 +1,5 @@
+"use client";
+
 import { type ReactNode } from "react";
 
 import { ImageSettingsTheme } from "@/components/image-settings-panel";

@@ -1,3 +1,5 @@
+"use client";
+
 import { GithubOutlined } from "@ant-design/icons";
 
 import { cn } from "@/lib/utils";

@@ -1,3 +1,5 @@
+"use client";
+
 import localforage from "localforage";
 import { nanoid } from "nanoid";
 

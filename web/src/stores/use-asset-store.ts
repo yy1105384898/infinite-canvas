@@ -1,3 +1,5 @@
+"use client";
+
 import { create } from "zustand";
 import { persist, type PersistStorage, type StorageValue } from "zustand/middleware";
 
@@ -87,7 +89,7 @@ export const useAssetStore = create<AssetStore>()(
             replaceAssets: (assets) => set({ assets }),
             cleanupImages: (extra) => {
                 window.setTimeout(async () => {
-                    const { useCanvasStore } = await import("@/stores/canvas/use-canvas-store");
+                    const { useCanvasStore } = await import("@/app/(user)/canvas/stores/use-canvas-store");
                     await cleanupUnusedImages({ assets: get().assets, projects: useCanvasStore.getState().projects, extra });
                     await cleanupUnusedMedia({ assets: get().assets, projects: useCanvasStore.getState().projects, extra });
                 }, 0);

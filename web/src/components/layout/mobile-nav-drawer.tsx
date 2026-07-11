@@ -1,5 +1,7 @@
+"use client";
+
 import { Drawer } from "antd";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 
 import { navigationTools, type NavigationToolSlug } from "@/constant/navigation-tools";
 import { cn } from "@/lib/utils";
@@ -20,7 +22,7 @@ export function MobileNavDrawer({ open, activeToolSlug, onClose }: MobileNavDraw
                     return (
                         <Link
                             key={tool.slug}
-                            to={`/${tool.slug}`}
+                            href={`/${tool.slug}`}
                             onClick={onClose}
                             className={cn(
                                 "flex items-center gap-3 rounded-lg px-3 py-3 text-base transition",

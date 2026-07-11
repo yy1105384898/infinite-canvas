@@ -1,3 +1,5 @@
+"use client";
+
 import { type ReactNode, useState } from "react";
 import { ConfigProvider, Switch } from "antd";
 
@@ -27,9 +29,6 @@ const aspectOptions = [
     { value: "9:16-4k", label: "9:16(4k)", size: "2160x3840", width: 2160, height: 3840, icon: "portrait" },
     { value: "auto", label: "auto", width: 0, height: 0, icon: "auto" },
 ];
-
-export const imageQualityOptions = qualityOptions.map((item) => ({ value: item.value, label: item.label }));
-export const imageAspectOptions = aspectOptions.map((item) => ({ value: item.size || item.value, label: item.label }));
 
 type ImageSettingsPanelProps = {
     config: AiConfig;

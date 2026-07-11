@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useId, useMemo, useState } from "react";
 import { Cpu } from "lucide-react";
 

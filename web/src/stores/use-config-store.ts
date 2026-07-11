@@ -1,3 +1,5 @@
+"use client";
+
 import { useMemo } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
@@ -46,13 +48,13 @@ export type AiConfig = {
 };
 
 export type WebdavSyncConfig = {
+    proxyMode: "direct" | "nextjs";
     url: string;
     username: string;
     password: string;
     directory: string;
     lastSyncedAt: string;
 };
-export type ConfigTabKey = "channels" | "models" | "preferences" | "webdav" | "codex";
 
 export const CONFIG_STORE_KEY = "infinite-canvas:ai_config_store";
 export type ModelCapability = "image" | "video" | "text" | "audio";
@@ -101,6 +103,7 @@ export const defaultConfig: AiConfig = {
 };
 
 export const defaultWebdavSyncConfig: WebdavSyncConfig = {
+    proxyMode: "direct",
     url: "",
     username: "",
     password: "",
@@ -112,12 +115,11 @@ type ConfigStore = {
     config: AiConfig;
     webdav: WebdavSyncConfig;
     isConfigOpen: boolean;
-    configTab: ConfigTabKey;
     shouldPromptContinue: boolean;
     updateConfig: <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => void;
     updateWebdavConfig: <K extends keyof WebdavSyncConfig>(key: K, value: WebdavSyncConfig[K]) => void;
     isAiConfigReady: (config: AiConfig, model: string) => boolean;
-    openConfigDialog: (shouldPromptContinue?: boolean, tab?: ConfigTabKey) => void;
+    openConfigDialog: (shouldPromptContinue?: boolean) => void;
     setConfigDialogOpen: (isOpen: boolean) => void;
     clearPromptContinue: () => void;
 };
@@ -173,7 +175,6 @@ export const useConfigStore = create<ConfigStore>()(
             config: defaultConfig,
             webdav: defaultWebdavSyncConfig,
             isConfigOpen: false,
-            configTab: "channels",
             shouldPromptContinue: false,
             updateConfig: (key, value) =>
                 set((state) => ({
@@ -190,7 +191,7 @@ export const useConfigStore = create<ConfigStore>()(
                     },
                 })),
             isAiConfigReady: (config, model) => isAiConfigReady(config, model),
-            openConfigDialog: (shouldPromptContinue = false, configTab = "channels") => set({ isConfigOpen: true, shouldPromptContinue, configTab }),
+            openConfigDialog: (shouldPromptContinue = false) => set({ isConfigOpen: true, shouldPromptContinue }),
             setConfigDialogOpen: (isConfigOpen) => set({ isConfigOpen }),
             clearPromptContinue: () => set({ shouldPromptContinue: false }),
         }),
@@ -299,8 +300,8 @@ export function normalizeModelOptionValue(value: string | undefined, channels: M
         const channel = channels.find((item) => item.id === decoded.channelId);
         return channel && channel.models.includes(decoded.model) ? model : "";
     }
-    const channel = channels.find((item) => item.models.includes(model)) || channels[0];
-    return channel && channel.models.includes(model) ? encodeChannelModel(channel.id, model) : model;
+    const channel = channels.find((item) => item.models.includes(decoded?.model || model)) || channels[0];
+    return channel && channel.models.includes(decoded?.model || model) ? encodeChannelModel(channel.id, decoded?.model || model) : model;
 }
 
 export function resolveModelChannel(config: AiConfig, value: string) {
