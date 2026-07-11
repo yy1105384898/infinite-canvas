@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 
 import { ModelPicker } from "@/components/model-picker";
 import { fetchChannelModels } from "@/services/api/image";
+import { fetchChannelPricingSnapshot, findModelPricing, modelPricingLabel, type ChannelPricingSnapshot } from "@/services/api/pricing";
 import { syncAppDataToWebdav, type AppSyncDomainKey, type AppSyncProgressEvent } from "@/services/app-sync";
 import { testWebdavConnection, WEBDAV_MANIFEST_FILE_NAME } from "@/services/webdav-sync";
 import { audioFormatOptions, audioVoiceOptions, normalizeAudioSpeedValue } from "@/lib/audio-generation";
 import { useAgentStore } from "@/stores/use-agent-store";
-import { createModelChannel, defaultBaseUrlForApiFormat, filterModelsByCapability, modelOptionLabel, modelOptionsFromChannels, normalizeModelOptionValue, useConfigStore, type AiConfig, type ApiCallFormat, type ConfigTabKey, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
+import { createModelChannel, defaultBaseUrlForApiFormat, filterModelsByCapability, modelOptionLabel, modelOptionName, modelOptionsFromChannels, normalizeModelOptionValue, resolveModelChannel, useConfigStore, type AiConfig, type ApiCallFormat, type ConfigTabKey, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
 
 type ModelGroup = {
     capability: ModelCapability;
@@ -87,7 +88,23 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
     const setAgentState = useAgentStore((state) => state.setAgentState);
     const connectAgent = useAgentStore((state) => state.connectAgent);
     const disconnectAgent = useAgentStore((state) => state.disconnectAgent);
-    const modelOptions = config.models.map((model) => ({ label: modelOptionLabel(config, model), value: model }));
+    const [pricingByBaseUrl, setPricingByBaseUrl] = useState<Record<string, ChannelPricingSnapshot>>({});
+    useEffect(() => {
+        let cancelled = false;
+        const baseUrls = Array.from(new Set(config.models.map((model) => resolveModelChannel(config, model).baseUrl.trim()).filter(Boolean)));
+        if (!baseUrls.length) return;
+        Promise.all(baseUrls.map(async (baseUrl) => [baseUrl, await fetchChannelPricingSnapshot(baseUrl)] as const)).then((entries) => {
+            if (!cancelled) setPricingByBaseUrl((current) => ({ ...current, ...Object.fromEntries(entries) }));
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [config]);
+    const modelOptions = config.models.map((model) => {
+        const channel = resolveModelChannel(config, model);
+        const price = modelPricingLabel(findModelPricing(pricingByBaseUrl[channel.baseUrl.trim()], modelOptionName(model)));
+        return { label: price ? `${modelOptionLabel(config, model)} · ${price}` : modelOptionLabel(config, model), value: model };
+    });
     const webdavReady = Boolean(webdav.url.trim());
     useEffect(() => setActiveTab(initialTab), [initialTab]);
 
