@@ -3,7 +3,7 @@ import axios from "axios";
 import { dataUrlToFile } from "@/lib/image-utils";
 import { getMediaBlob, uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { imageToDataUrl } from "@/services/image-storage";
-import { boolConfig, buildSeedancePromptText, isSeedanceVideoConfig, normalizeSeedanceDuration, normalizeSeedanceRatio, normalizeSeedanceResolution, seedanceVideoReferenceError, SEEDANCE_REFERENCE_LIMITS } from "@/lib/seedance-video";
+import { boolConfig, buildSeedancePromptText, isArkPlanBaseUrl, isSeedanceVideoConfig, normalizeSeedanceDuration, normalizeSeedanceRatio, normalizeSeedanceResolution, seedanceVideoReferenceError, SEEDANCE_REFERENCE_LIMITS } from "@/lib/seedance-video";
 import { buildApiUrl, modelOptionName, resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
@@ -55,8 +55,11 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
     const selectedModel = (config.model || config.videoModel).trim();
     const requestConfig = resolveModelRequestConfig(config, selectedModel);
     assertVideoConfig(requestConfig, requestConfig.model);
-    if (isSeedanceVideoConfig(requestConfig)) {
+    if (isSeedanceVideoConfig(requestConfig) && isArkPlanBaseUrl(requestConfig.baseUrl)) {
         return createSeedanceTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
+    }
+    if (isSeedanceVideoConfig(requestConfig)) {
+        return createOpenAISeedanceTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
     }
     if (videoReferences.length || audioReferences.length) {
         throw new Error("当前视频接口不支持参考视频或参考音频，请切换到 Seedance 2.0 / 火山 Agent Plan 模型，或移除参考素材");
@@ -98,6 +101,23 @@ async function createOpenAIVideoTask(config: AiConfig, model: string, prompt: st
         return { id: created.id, provider: "openai", model };
     } catch (error) {
         throw new Error(readAxiosError(error, "视频任务创建失败"));
+    }
+}
+
+async function createOpenAISeedanceTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[], options?: RequestOptions): Promise<VideoGenerationTask> {
+    if ((videoReferences.length || audioReferences.length) && !references.length) {
+        throw new Error("Seedance 参考视频/音频必须同时添加至少 1 张主图");
+    }
+    assertSeedanceVideoReferences(videoReferences);
+    assertSeedanceAudioReferences(audioReferences);
+    const payload = await buildOpenAISeedancePayload(config, model, prompt, references, videoReferences, audioReferences);
+    if (!payload.prompt) throw new Error("请输入视频提示词，或连接参考图片/视频/音频");
+    try {
+        const created = unwrapVideoResponse((await axios.post<ApiVideoResponse>(aiApiUrl(config, "/videos"), payload, { headers: aiHeaders(config, "application/json"), signal: options?.signal })).data);
+        if (!created.id) throw new Error("视频接口没有返回任务 ID");
+        return { id: created.id, provider: "openai", model };
+    } catch (error) {
+        throw new Error(readAxiosError(error, "Seedance 视频任务创建失败"));
     }
 }
 
@@ -182,6 +202,62 @@ function assertSeedanceAudioReferences(audioReferences: ReferenceAudio[]) {
 
 function seedanceApiUrl(config: AiConfig, taskId?: string) {
     return buildApiUrl(config.baseUrl, `/contents/generations/tasks${taskId ? `/${encodeURIComponent(taskId)}` : ""}`);
+}
+
+async function buildOpenAISeedancePayload(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[]) {
+    const imageReferences = references.slice(0, SEEDANCE_REFERENCE_LIMITS.images);
+    const imageUrls = await Promise.all(imageReferences.map((image) => resolveSeedanceImageUrl(config, image)));
+    const videoUrls = await Promise.all(videoReferences.slice(0, SEEDANCE_REFERENCE_LIMITS.videos).map((video) => resolveSeedanceVideoUrl(video)));
+    const audioUrls = await Promise.all(audioReferences.slice(0, SEEDANCE_REFERENCE_LIMITS.audios).map((audio) => resolveSeedanceAudioUrl(audio)));
+    const frameMode = seedanceFrameMode(imageReferences, imageUrls, videoUrls, audioUrls);
+    const ratio = normalizeSeedanceRatio(config.size);
+    const payload: Record<string, unknown> = {
+        model: modelOptionName(model),
+        prompt: frameMode ? prompt.trim() : buildOpenAISeedancePromptText(prompt, imageUrls.length, videoUrls.length, audioUrls.length),
+        duration: normalizeOpenAISeedanceDuration(config.videoSeconds),
+        resolution: normalizeOpenAISeedanceResolution(config.vquality, modelOptionName(model)),
+    };
+    if (ratio !== "adaptive") payload.aspect_ratio = ratio;
+    if (frameMode) {
+        payload.first_image_url = frameMode.firstUrl;
+        payload.last_image_url = frameMode.lastUrl;
+    } else if (imageUrls.length) {
+        payload.image_url = imageUrls[0];
+        if (imageUrls.length > 1) payload.reference_image_urls = imageUrls.slice(1);
+    }
+    if (videoUrls.length) payload.reference_videos = videoUrls;
+    if (audioUrls.length) payload.reference_audios = audioUrls;
+    return payload;
+}
+
+function seedanceFrameMode(references: ReferenceImage[], imageUrls: string[], videoUrls: string[], audioUrls: string[]) {
+    const firstIndex = references.findIndex((image) => image.videoFrameRole === "first");
+    const lastIndex = references.findIndex((image) => image.videoFrameRole === "last");
+    if (firstIndex < 0 && lastIndex < 0) return null;
+    if (firstIndex < 0 || lastIndex < 0) throw new Error("Seedance 首尾帧模式需要同时连接首帧和尾帧两张图片");
+    if (firstIndex === lastIndex) throw new Error("Seedance 首帧和尾帧不能是同一张图片");
+    if (references.length !== 2 || videoUrls.length || audioUrls.length) throw new Error("Seedance 首尾帧模式只允许首帧和尾帧两张图片，不能混用参考图/视频/音频");
+    return { firstUrl: imageUrls[firstIndex], lastUrl: imageUrls[lastIndex] };
+}
+
+function buildOpenAISeedancePromptText(prompt: string, imageCount: number, videoCount: number, audioCount: number) {
+    const text = prompt.trim();
+    const labels = [
+        ...Array.from({ length: imageCount }, (_, index) => `@image${index + 1}`),
+        ...Array.from({ length: videoCount }, (_, index) => `@video${index + 1}`),
+        ...Array.from({ length: audioCount }, (_, index) => `@audio${index + 1}`),
+    ];
+    if (!labels.length) return text;
+    return `参考素材编号：${labels.join("、")}。请按这些编号理解提示词中的图片、视频和音频引用。\n\n${text}`;
+}
+
+function normalizeOpenAISeedanceDuration(value: string) {
+    const duration = normalizeSeedanceDuration(value);
+    return duration === -1 ? 5 : duration;
+}
+
+function normalizeOpenAISeedanceResolution(value: string, model = "") {
+    return normalizeSeedanceResolution(value, model);
 }
 
 async function buildSeedanceContent(config: AiConfig, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[]) {
