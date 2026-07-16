@@ -1,6 +1,6 @@
-import { Check, Search } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Search } from "lucide-react";
 import { type UIEvent, useEffect, useState } from "react";
-import { App, Empty, Input, Modal, Spin, Tag } from "antd";
+import { App, Button, Empty, Input, Modal, Spin, Tag } from "antd";
 
 import { ALL_PROMPTS_OPTION } from "@/services/api/prompts";
 import { cn } from "@/lib/utils";
@@ -12,7 +12,9 @@ export function PromptSelectDialog({ open, onOpenChange, onSelect }: { open: boo
     const [keyword, setKeyword] = useState("");
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
     const [selectedCategory, setSelectedCategory] = useState(ALL_PROMPTS_OPTION);
+    const [showAllTags, setShowAllTags] = useState(false);
     const { query, items, tags: promptTags, categories: promptCategories } = usePromptList({ keyword, tags: selectedTags, category: selectedCategory, enabled: open });
+    const visibleTags = showAllTags ? promptTags : promptTags.slice(0, 32);
     const toggleTag = (tag: string) => {
         if (tag === ALL_PROMPTS_OPTION) return setSelectedTags([]);
         setSelectedTags((items) => (items.includes(tag) ? items.filter((item) => item !== tag) : [...items, tag]));
@@ -50,8 +52,8 @@ export function PromptSelectDialog({ open, onOpenChange, onSelect }: { open: boo
                     </div>
                     <div className="grid gap-2 sm:grid-cols-[56px_minmax(0,1fr)] sm:items-start">
                         <div className="pt-2 text-xs font-medium text-stone-500 dark:text-stone-400">标签</div>
-                        <div className="flex flex-wrap gap-2">
-                            {promptTags.map((tag) => {
+                        <div className="flex flex-wrap items-center gap-2">
+                            {visibleTags.map((tag) => {
                                 const active = tag === ALL_PROMPTS_OPTION ? selectedTags.length === 0 : selectedTags.includes(tag);
                                 return (
                                     <Tag.CheckableTag key={tag} checked={active} className={cn("prompt-filter-tag", active && "is-active")} onChange={() => toggleTag(tag)}>
@@ -59,6 +61,15 @@ export function PromptSelectDialog({ open, onOpenChange, onSelect }: { open: boo
                                     </Tag.CheckableTag>
                                 );
                             })}
+                            {promptTags.length > visibleTags.length ? (
+                                <Button type="link" size="small" className="h-6 px-0 text-xs" icon={<ChevronDown className="size-3.5" />} iconPosition="end" onClick={() => setShowAllTags(true)}>
+                                    展开全部 ({promptTags.length})
+                                </Button>
+                            ) : showAllTags && promptTags.length > 32 ? (
+                                <Button type="link" size="small" className="h-6 px-0 text-xs" icon={<ChevronUp className="size-3.5" />} iconPosition="end" onClick={() => setShowAllTags(false)}>
+                                    收起
+                                </Button>
+                            ) : null}
                         </div>
                     </div>
                 </div>
