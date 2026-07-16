@@ -24,6 +24,7 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
     const options = useMemo(() => Array.from(new Set([...(config.channelMode === "local" && !capability ? [value] : []), ...selectableModelsByCapability(config, capability)].filter((model): model is string => Boolean(model)))), [capability, config, value]);
     const current = value || "";
     const modelsForPricing = useMemo(() => Array.from(new Set([current, ...options].filter(Boolean))), [current, options]);
+    const currentPrice = current ? priceForModel(config, current, pricingByBaseUrl) : "";
 
     useEffect(() => {
         let cancelled = false;
@@ -65,10 +66,10 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
                 )}
                 onMouseDown={(event) => event.stopPropagation()}
                 onPointerDown={(event) => event.stopPropagation()}
-                title={current ? modelOptionLabel(config, current) : placeholder}
+                title={current ? [modelOptionLabel(config, current), currentPrice].filter(Boolean).join(" · ") : placeholder}
             >
                 <ModelIcon model={current} />
-                <span className="canvas-model-picker-text min-w-0 flex-1 truncate text-left">{current ? modelOptionLabel(config, current) : placeholder}</span>
+                <span className="canvas-model-picker-text min-w-0 flex-1 truncate text-left">{current ? [modelOptionLabel(config, current), currentPrice].filter(Boolean).join(" · ") : placeholder}</span>
             </SelectTrigger>
             <SelectContent
                 data-canvas-no-zoom

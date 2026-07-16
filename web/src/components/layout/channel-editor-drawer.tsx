@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { defaultBaseUrlForApiFormat, guessCapability, normalizeChannelModels, type ApiCallFormat, type ChannelModel, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
 import { ModelScriptEditor } from "./model-script-editor";
 import { ModelSelectModal } from "./model-select-modal";
+import { fetchChannelPricingSnapshot, findModelPricing, modelPricingLabel, type ChannelPricingSnapshot } from "@/services/api/pricing";
+import { modelOptionName } from "@/stores/use-config-store";
 
 const apiFormatOptions: Array<{ label: string; value: ApiCallFormat }> = [
     { label: "OpenAI", value: "openai" },
@@ -24,10 +26,25 @@ export function ChannelEditorDrawer({ open, channel, onSave, onClose }: { open: 
     const [draft, setDraft] = useState<ModelChannel | null>(channel);
     const [selectOpen, setSelectOpen] = useState(false);
     const [scriptTarget, setScriptTarget] = useState<ScriptTarget | null>(null);
+    const [pricing, setPricing] = useState<ChannelPricingSnapshot | null>(null);
 
     useEffect(() => {
         if (open && channel) setDraft(channel);
     }, [open, channel]);
+
+    useEffect(() => {
+        if (!open || !draft?.baseUrl.trim()) {
+            setPricing(null);
+            return;
+        }
+        let cancelled = false;
+        fetchChannelPricingSnapshot(draft.baseUrl).then((snapshot) => {
+            if (!cancelled) setPricing(snapshot);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [draft?.baseUrl, open]);
 
     if (!draft) return null;
 
@@ -104,6 +121,7 @@ export function ChannelEditorDrawer({ open, channel, onSave, onClose }: { open: 
                         <div key={model.name} className="flex flex-wrap items-center gap-3 rounded-md px-2 py-1.5 hover:bg-stone-50 dark:hover:bg-stone-900/40">
                             <span className="min-w-0 flex-1 truncate text-sm" title={model.name}>
                                 {model.name}
+                                {modelPricingLabel(findModelPricing(pricing || undefined, modelOptionName(model.name))) ? <span className="ml-2 text-xs text-stone-500">{modelPricingLabel(findModelPricing(pricing || undefined, modelOptionName(model.name)))}</span> : null}
                             </span>
                             <div className="flex shrink-0 items-center gap-2">
                                 <Segmented size="small" value={model.capability} options={capabilityOptions} onChange={(value) => setCapability(model.name, value as ModelCapability)} />
