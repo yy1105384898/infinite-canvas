@@ -26,7 +26,6 @@ type CanvasNodeProps = {
     editRequestNonce?: number;
     showPanel: boolean;
     showImageInfo: boolean;
-    resourceLabel?: CanvasResourceReference;
     mentionReferences?: CanvasResourceReference[];
     pluginHost?: CanvasPluginHost;
     registryVersion?: number;
@@ -53,7 +52,6 @@ type CanvasNodeProps = {
     onRetry?: (node: CanvasNodeData) => void;
     onGenerateImage?: (node: CanvasNodeData) => void;
     onViewImage?: (node: CanvasNodeData) => void;
-    onViewReference?: (nodeId: string) => void;
     onContextMenu: (event: React.MouseEvent, nodeId: string) => void;
 };
 
@@ -74,7 +72,6 @@ type NodeContentRendererProps = {
     mentionReferences: CanvasResourceReference[];
     onRetry?: (node: CanvasNodeData) => void;
     onGenerateImage?: (node: CanvasNodeData) => void;
-    onViewReference?: (nodeId: string) => void;
     onToggleBatch?: () => void;
     onSetBatchPrimary?: () => void;
     groupChildCount: number;
@@ -91,7 +88,6 @@ export const CanvasNode = React.memo(function CanvasNode({
     editRequestNonce = 0,
     showPanel,
     showImageInfo,
-    resourceLabel,
     mentionReferences = [],
     pluginHost,
     renderPanel,
@@ -117,7 +113,6 @@ export const CanvasNode = React.memo(function CanvasNode({
     onRetry,
     onGenerateImage,
     onViewImage,
-    onViewReference,
     onContextMenu,
 }: CanvasNodeProps) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
@@ -316,39 +311,41 @@ export const CanvasNode = React.memo(function CanvasNode({
             onMouseDownCapture={(event) => onSelectCapture?.(event, data.id)}
             onContextMenu={(event) => onContextMenu(event, data.id)}
         >
-            <div className="absolute left-3 top-[-28px] z-[65] max-w-[calc(100%-24px)]" onMouseDown={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}>
-                {isEditingTitle ? (
-                    <input
-                        ref={titleInputRef}
-                        value={titleDraft}
-                        maxLength={64}
-                        className="h-6 max-w-full border-0 border-b border-dashed bg-transparent px-0 text-left text-xs font-medium outline-none"
-                        style={{ borderColor: theme.node.muted, color: theme.node.text }}
-                        onChange={(event) => setTitleDraft(event.target.value)}
-                        onBlur={finishTitleEditing}
-                        onKeyDown={(event) => {
-                            if (event.key === "Enter") finishTitleEditing();
-                            if (event.key === "Escape") {
-                                setTitleDraft(data.title || "");
-                                setIsEditingTitle(false);
-                            }
-                        }}
-                    />
-                ) : (
-                    <button
-                        type="button"
-                        className="block max-w-full truncate border-b border-dashed border-transparent px-0 py-0.5 text-left text-xs font-medium opacity-75 transition hover:border-current hover:opacity-100"
-                        style={{ color: theme.node.text }}
-                        title="双击修改节点名称"
-                        onDoubleClick={(event) => {
-                            event.stopPropagation();
-                            setIsEditingTitle(true);
-                        }}
-                    >
-                        {data.title || "未命名节点"}
-                    </button>
-                )}
-            </div>
+            {(isSelected || hovered || isEditingTitle) && (
+                <div className="absolute left-3 top-[-28px] z-[65] max-w-[calc(100%-24px)]" onMouseDown={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}>
+                    {isEditingTitle ? (
+                        <input
+                            ref={titleInputRef}
+                            value={titleDraft}
+                            maxLength={64}
+                            className="h-6 max-w-full border-0 border-b border-dashed bg-transparent px-0 text-left text-xs font-medium outline-none"
+                            style={{ borderColor: theme.node.muted, color: theme.node.text }}
+                            onChange={(event) => setTitleDraft(event.target.value)}
+                            onBlur={finishTitleEditing}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter") finishTitleEditing();
+                                if (event.key === "Escape") {
+                                    setTitleDraft(data.title || "");
+                                    setIsEditingTitle(false);
+                                }
+                            }}
+                        />
+                    ) : (
+                        <button
+                            type="button"
+                            className="block max-w-full truncate border-b border-dashed border-transparent px-0 py-0.5 text-left text-xs font-medium opacity-75 transition hover:border-current hover:opacity-100"
+                            style={{ color: theme.node.text }}
+                            title="双击修改节点名称"
+                            onDoubleClick={(event) => {
+                                event.stopPropagation();
+                                setIsEditingTitle(true);
+                            }}
+                        >
+                            {data.title || "未命名节点"}
+                        </button>
+                    )}
+                </div>
+            )}
 
             <div
                 className="relative h-full w-full overflow-visible rounded-3xl border-2"
@@ -410,7 +407,6 @@ export const CanvasNode = React.memo(function CanvasNode({
                         onStopEditing={() => setIsEditingContent(false)}
                         onRetry={onRetry}
                         onGenerateImage={onGenerateImage}
-                        onViewReference={onViewReference}
                         onToggleBatch={() => onToggleBatch?.(data.id)}
                         onSetBatchPrimary={() => onSetBatchPrimary?.(data)}
                         groupChildCount={groupChildCount}
@@ -418,7 +414,6 @@ export const CanvasNode = React.memo(function CanvasNode({
                 </div>
 
                 {showImageInfo && hasImageContent ? <ImageInfoBar node={data} /> : null}
-                {resourceLabel ? <ResourceLabelBadge reference={resourceLabel} /> : null}
 
                 {!isGroup && !hasImageContent && !hasVideoContent && !hasAudioContent ? <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12" style={{ background: `linear-gradient(to top, ${theme.canvas.background}66, transparent)` }} /> : null}
 
@@ -520,14 +515,12 @@ function MissingPluginContent({ theme, type }: Pick<NodeContentRendererProps, "t
     );
 }
 
-function TextContent({ node, theme, isEditingContent, textareaRef, mentionReferences, onContentChange, onStopEditing, onGenerateImage, onViewReference }: NodeContentRendererProps) {
+function TextContent({ node, theme, isEditingContent, textareaRef, mentionReferences, onContentChange, onStopEditing, onGenerateImage }: NodeContentRendererProps) {
     const fontSize = node.metadata?.fontSize || 14;
     const textStyle = { fontSize: `${fontSize}px`, lineHeight: `${Math.round(fontSize * 1.65)}px`, color: theme.node.text, boxSizing: "border-box" } as React.CSSProperties;
-    const attachedMediaReferences = mentionReferences.filter((reference) => reference.active && reference.kind !== "text");
 
     return (
-        <div className={`flex h-full w-full flex-col overflow-hidden ${attachedMediaReferences.length ? "pt-20" : "pt-8"}`}>
-            {attachedMediaReferences.length ? <AttachedReferenceStrip references={attachedMediaReferences} onViewReference={onViewReference} /> : null}
+        <div className="flex h-full w-full flex-col overflow-hidden pt-8">
             <button
                 type="button"
                 className="absolute right-3 top-3 z-20 inline-flex h-8 items-center gap-1 rounded-full border px-2.5 text-xs font-medium opacity-85 backdrop-blur-md transition hover:scale-[1.02] hover:opacity-100"
@@ -552,7 +545,6 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
                     value={node.metadata?.content || ""}
                     references={mentionReferences}
                     highlightLabels={false}
-                    mentionMenuEnabled={false}
                     onChange={(value) => onContentChange(node.id, value)}
                     onBlur={onStopEditing}
                     onKeyDown={(event) => {
@@ -572,57 +564,6 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
                 </div>
             )}
         </div>
-    );
-}
-
-function AttachedReferenceStrip({ references, onViewReference }: { references: CanvasResourceReference[]; onViewReference?: (nodeId: string) => void }) {
-    return (
-        <div className="pointer-events-none absolute left-4 top-3 z-20 flex max-w-[calc(100%-112px)] flex-wrap items-start gap-2">
-            {references.slice(0, 9).map((reference) => (
-                <div key={reference.nodeId} className="flex min-w-0 flex-col items-start gap-1">
-                    <ReferenceTinyPreview reference={reference} onViewReference={onViewReference} />
-                    <span className="max-w-16 truncate text-[10px] font-semibold leading-none text-[#2f80ff]">{reference.apiLabel || reference.label}</span>
-                </div>
-            ))}
-            {references.length > 9 ? <span className="rounded bg-black/45 px-1.5 py-1 text-[10px] font-medium leading-none text-white">+{references.length - 9}</span> : null}
-        </div>
-    );
-}
-
-function ReferenceTinyPreview({ reference, onViewReference }: { reference: CanvasResourceReference; onViewReference?: (nodeId: string) => void }) {
-    if (reference.kind === "image" && reference.previewUrl)
-        return (
-            <button
-                type="button"
-                className="pointer-events-auto block size-10 overflow-hidden rounded-md shadow-sm outline-none ring-0 transition hover:scale-105 focus-visible:ring-2 focus-visible:ring-[#2f80ff]"
-                title="双击放大图片"
-                aria-label="双击放大图片"
-                onMouseDown={(event) => event.stopPropagation()}
-                onPointerDown={(event) => event.stopPropagation()}
-                onClick={(event) => event.stopPropagation()}
-                onDoubleClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    onViewReference?.(reference.nodeId);
-                }}
-            >
-                <img src={reference.previewUrl} alt="" className="h-full w-full object-cover" draggable={false} />
-            </button>
-        );
-    if (reference.kind === "video" && reference.previewUrl) return <video src={reference.previewUrl} className="size-10 rounded-md bg-black object-cover shadow-sm" muted preload="metadata" />;
-    const Icon = reference.kind === "audio" ? Music2 : reference.kind === "video" ? Video : ImageIcon;
-    return (
-        <span className="grid size-10 place-items-center rounded-md bg-black/15 shadow-sm">
-            <Icon className="size-4 opacity-65" />
-        </span>
-    );
-}
-
-function ResourceLabelBadge({ reference }: { reference: CanvasResourceReference }) {
-    return (
-        <span className={`pointer-events-none absolute right-2 top-2 z-30 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${reference.active ? "bg-[#2f80ff] text-white shadow-sm" : "bg-black/35 text-white/75"}`}>
-            {reference.label}
-        </span>
     );
 }
 
